@@ -6,6 +6,18 @@ Lokale Web-App (reines HTML/JavaScript) für die Garmin Personal API:
 - **Heatmap**: alle GPS-Tracks auf einer Karte (vereinfachte Karte, Satellit oder dunkler „Game“-Look mit Neon-Glow). Linienbreite und Farbe zeigen, wie oft ein Abschnitt gefahren wurde.
 - **Poster**: Share-Grafik einer einzelnen Aktivität (1:1, 4:5, 9:16) als PNG.
 
+## Demo
+
+**Heatmap im „Game“-Look** – alle Aktivitäten auf einer dunklen Vektorkarte mit Neon-Glow. Je öfter ein Abschnitt gefahren wurde, desto breiter und heller die Linie.
+
+![Heatmap aller Aktivitäten im Game-Look](screenshots/heatmap-game-2026-10-24.png)
+
+**Poster einer einzelnen Aktivität** – Route mit Glow, Höhenprofil und Kennzahlen, exportiert als PNG (hier 1:1, auch 4:5 und 9:16 möglich).
+
+<p align="center">
+  <img src="screenshots/2026-08-08-mariazell-200er.png" alt="Poster der Aktivität Mariazell 200er" width="540">
+</p>
+
 ## Voraussetzungen
 
 - Chrome oder Edge (File System Access API zum Speichern der Dateien)
@@ -49,3 +61,4 @@ Die Häufigkeit pro Abschnitt wird beim Laden der Heatmap aus `heatmap.json` ber
 - `js/heatmap.js` – MapLibre-Karte, `js/poster.js` – Poster-Renderer
 - `js/app.js` – UI-Logik
 - `proxy.py`, `start.command` – Mini-Proxy
+- `screenshots/` – Demo-Bilder für diese README
