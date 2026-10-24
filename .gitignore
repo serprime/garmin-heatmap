@@ -1,0 +1,8 @@
+# secrets
+config.js
+garmin-api-key.txt
+# downloaded activity data
+data/
+# ide / os
+.idea/
+.DS_Store

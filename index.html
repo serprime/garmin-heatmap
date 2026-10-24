@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Garmin Heatmap</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+  :root {
+    --bg: #0b0f17; --surface: #121826; --surface2: #182033; --border: #243049; --text: #e5e7eb; --muted: #94a3b8;
+    --accent: #22d3ee; --accent2: #a78bfa; --ok: #22c55e; --bad: #ef4444; --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; }
+  a { color: var(--accent); }
+  .hidden { display: none !important; }
+  button { font: inherit; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: linear-gradient(135deg, #0891b2, #2563eb); border-color: transparent; font-weight: 600; }
+  button.active { background: var(--accent); color: #04121a; border-color: var(--accent); font-weight: 600; }
+  select, input[type=text] { font: inherit; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+  input[type=checkbox] { accent-color: var(--accent); }
+  code { background: var(--surface2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+
+  header.topbar { display: flex; align-items: center; gap: 18px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--border); flex: 0 0 auto; }
+  .brand { font-weight: 800; letter-spacing: .3px; font-size: 16px; background: linear-gradient(90deg, #22d3ee, #a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tabs { display: flex; gap: 4px; }
+  .tabs button { background: transparent; border-color: transparent; padding: 6px 12px; }
+  .tabs button.active { background: var(--surface2); border-color: var(--border); color: var(--text); }
+  .pills { margin-left: auto; display: flex; gap: 6px; }
+  .pill { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .pill.ok { border-color: rgba(34,197,94,.5); color: #86efac; }
+  .pill.bad { border-color: rgba(239,68,68,.5); color: #fca5a5; }
+  .pill.warn { border-color: rgba(245,158,11,.5); color: #fcd34d; }
+
+  main { flex: 1 1 auto; min-height: 0; position: relative; }
+  .tab { height: 100%; }
+
+  /* Sync */
+  #tab-sync { overflow: auto; padding: 22px; max-width: 1100px; margin: 0 auto; }
+  .notice { background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.4); padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; }
+  .banner { display: flex; align-items: center; gap: 14px; background: linear-gradient(90deg, rgba(34,211,238,.15), rgba(167,139,250,.15)); border: 1px solid rgba(34,211,238,.4); padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; font-weight: 600; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .card p { margin: 0 0 10px; color: var(--text); min-height: 2.8em; }
+  .card .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stats { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+  .stat .v { font-size: 22px; font-weight: 700; }
+  .stat .l { font-size: 12px; color: var(--muted); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  #progress { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+  .bar { height: 10px; background: var(--surface2); border-radius: 999px; overflow: hidden; margin-bottom: 8px; }
+  #bar-fill { height: 100%; width: 0; background: linear-gradient(90deg, #22d3ee, #a78bfa); transition: width .3s; border-radius: 999px; }
+  #bar-fill.indeterminate { animation: slide 1.2s infinite linear; width: 40% !important; }
+  #bar-fill.error { background: var(--bad); }
+  @keyframes slide { 0% { transform: translateX(-100%);} 100% { transform: translateX(260%);} }
+  #progress-current { color: var(--muted); font-size: 12.5px; }
+  #log { background: #070a10; border: 1px solid var(--border); border-radius: 12px; padding: 12px; height: 220px; overflow: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #cbd5e1; white-space: pre-wrap; margin: 0; }
+  .log-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: var(--muted); font-size: 12px; }
+  .help { color: var(--muted); font-size: 12.5px; margin-top: 18px; }
+
+  /* Heatmap */
+  #tab-heatmap { position: relative; }
+  #map { position: absolute; inset: 0; }
+  .map-ui { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 10px; max-width: 300px; z-index: 5; }
+  .panel { background: rgba(11,15,23,.88); backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+  .panel h4 { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .seg { display: flex; gap: 4px; }
+  .seg button { flex: 1; padding: 6px 8px; }
+  .filters label { display: inline-flex; align-items: center; gap: 5px; margin: 2px 8px 2px 0; font-size: 13px; }
+  .filters .count { color: var(--muted); font-size: 11px; }
+  .filters .mini { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .filters .mini button { padding: 1px 6px; font-size: 11px; }
+  #legend { position: absolute; right: 12px; bottom: 28px; z-index: 5; }
+  .legend-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 6px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 3px 0; }
+  .legend-line { display: inline-block; width: 36px; border-radius: 999px; }
+  #map-overlay { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; background: rgba(11,15,23,.6); font-weight: 600; font-size: 16px; }
+  #map-stats { position: absolute; left: 12px; bottom: 28px; z-index: 5; font-size: 11.5px; color: var(--muted); background: rgba(11,15,23,.7); padding: 3px 8px; border-radius: 6px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* Poster */
+  #tab-poster { display: flex; min-height: 0; }
+  #list-pane { width: 360px; flex: 0 0 auto; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface); }
+  #list-pane .search { padding: 12px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+  #list-pane .search input { flex: 1; }
+  #list-count { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  #activity-list { flex: 1; overflow: auto; }
+  .act { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .act:hover { background: var(--surface2); }
+  .act.active { background: rgba(34,211,238,.12); border-left: 3px solid var(--accent); }
+  .act.nogps { opacity: .55; }
+  .act-top { display: flex; justify-content: space-between; gap: 8px; }
+  .act-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .act-date { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .act-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .badge { display: inline-block; padding: 0 6px; border-radius: 999px; font-size: 11px; background: var(--surface2); color: var(--text); }
+  .badge.cycling { background: rgba(34,211,238,.18); color: #67e8f9; }
+  .badge.running { background: rgba(249,115,22,.18); color: #fdba74; }
+  .badge.walking { background: rgba(34,197,94,.18); color: #86efac; }
+  .badge.swimming { background: rgba(59,130,246,.18); color: #93c5fd; }
+  .empty { padding: 30px 16px; color: var(--muted); text-align: center; }
+  #list-more { margin: 10px; }
+  #poster-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #poster-toolbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  #poster-toolbar label { display: inline-flex; gap: 5px; align-items: center; }
+  #poster-stage { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 20px; background: radial-gradient(circle at 50% 30%, #121a2c, #070a10); }
+  #poster-canvas { max-width: 100%; max-height: calc(100vh - 140px); box-shadow: 0 20px 60px rgba(0,0,0,.6); border-radius: 6px; }
+  #poster-empty { color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">GARMIN HEATMAP</div>
+  <nav class="tabs">
+    <button data-tab="sync">Sync</button>
+    <button data-tab="heatmap">Heatmap</button>
+    <button data-tab="poster">Poster</button>
+  </nav>
+  <div class="pills">
+    <span id="pill-folder" class="pill">Ordner</span>
+    <span id="pill-proxy" class="pill">Proxy</span>
+    <span id="pill-key" class="pill">API-Key</span>
+  </div>
+</header>
+
+<main>
+  <!-- ================= SYNC ================= -->
+  <section id="tab-sync" class="tab">
+    <div id="unsupported" class="notice hidden">Dieser Browser unterstützt die File System Access API nicht. Bitte Chrome oder Edge verwenden, damit die Aktivitäten als Dateien gespeichert werden können.</div>
+
+    <div id="new-banner" class="banner hidden">
+      <span id="new-banner-text"></span>
+      <button id="btn-banner-download" class="primary">Jetzt herunterladen</button>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>Datenordner</h3>
+        <p id="folder-state">…</p>
+        <div class="row"><button id="btn-pick">Datenordner wählen</button><button id="btn-grant" class="primary hidden">Freigeben</button></div>
+      </div>
+      <div class="card">
+        <h3>Garmin-Proxy</h3>
+        <p id="proxy-state">…</p>
+        <div class="row"><button id="btn-proxy-retry">Erneut prüfen</button></div>
+      </div>
+      <div class="card">
+        <h3>API-Key</h3>
+        <p id="key-state">…</p>
+        <div class="row"><a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Key bei Garmin erstellen ↗</a></div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="v" id="stat-total">–</div><div class="l">Aktivitäten bei Garmin</div></div>
+      <div class="stat"><div class="v" id="stat-done">–</div><div class="l">heruntergeladen</div></div>
+      <div class="stat"><div class="v" id="stat-gps">–</div><div class="l">mit GPS</div></div>
+      <div class="stat"><div class="v" id="stat-km">–</div><div class="l">GPS-Kilometer</div></div>
+      <div class="stat"><div class="v" id="stat-pending">–</div><div class="l">ausstehend</div></div>
+      <div class="stat"><div class="v" id="stat-failed">–</div><div class="l">Fehler</div></div>
+      <div class="stat"><div class="v" id="stat-check" style="font-size:14px;line-height:30px">–</div><div class="l">letzter Abgleich</div></div>
+    </div>
+
+    <div class="actions">
+      <button id="btn-check">Neue Aktivitäten prüfen</button>
+      <button id="btn-download" class="primary">Herunterladen</button>
+      <button id="btn-full" title="Alle Seiten der Aktivitätsliste neu abgleichen (findet auch nachträglich importierte alte Aktivitäten)">Liste komplett abgleichen</button>
+      <button id="btn-reset-failed">Fehlgeschlagene erneut versuchen</button>
+      <button id="btn-rebuild" title="Heatmap-Modell aus den lokalen track.json-Dateien neu berechnen">Heatmap-Modell neu bauen</button>
+    </div>
+
+    <div id="progress" class="hidden">
+      <div class="bar"><div id="bar-fill"></div></div>
+      <div id="progress-text"></div>
+      <div id="progress-current"></div>
+    </div>
+
+    <div class="log-head"><span>Protokoll</span><button id="btn-clear-log" style="padding:2px 8px;font-size:11px">leeren</button></div>
+    <pre id="log"></pre>
+
+    <div class="help">
+      Ablauf: Ordner wählen → Proxy starten (<code>python3 proxy.py</code> oder <code>start.command</code>) → „Herunterladen“. Beim Start wird automatisch geprüft, ob es neue Aktivitäten gibt.
+      Im Datenordner liegen <code>catalog.json</code> (Liste aller Aktivitäten), <code>heatmap.json</code> (vereinfachtes Heatmap-Modell) und pro Aktivität ein Ordner mit <code>summary.json</code>, <code>activity.json</code>, der originalen FIT-Datei und <code>track.json</code>.
+    </div>
+  </section>
+
+  <!-- ================= HEATMAP ================= -->
+  <section id="tab-heatmap" class="tab hidden">
+    <div id="map"></div>
+    <div id="map-overlay" class="hidden">Berechne Heatmap …</div>
+    <div class="map-ui">
+      <div class="panel">
+        <h4>Ansicht</h4>
+        <div class="seg">
+          <button data-mode="map" class="active">Karte</button>
+          <button data-mode="sat">Satellit</button>
+          <button data-mode="game">Game</button>
+        </div>
+        <div id="palette-row" class="row hidden" style="margin-top:8px">
+          <label>Farbe <select id="palette"></select></label>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label><input type="checkbox" id="labels" checked> Beschriftungen</label>
+          <button id="btn-fit" style="margin-left:auto;padding:3px 8px;font-size:12px">Alles zeigen</button>
+        </div>
+      </div>
+      <div class="panel filters">
+        <h4>Sportart</h4>
+        <div id="filter-groups"></div>
+        <h4 style="margin-top:8px">Jahr</h4>
+        <div id="filter-years"></div>
+        <div class="mini"><button id="years-all">alle</button> <button id="years-none">keine</button> &nbsp; <span id="filter-stats"></span></div>
+      </div>
+      <div class="panel">
+        <button id="btn-export" class="primary" style="width:100%">PNG exportieren</button>
+      </div>
+    </div>
+    <div id="legend" class="panel"></div>
+    <div id="map-stats"></div>
+  </section>
+
+  <!-- ================= POSTER ================= -->
+  <section id="tab-poster" class="tab hidden">
+    <aside id="list-pane">
+      <div class="search"><input type="text" id="list-search" placeholder="Suchen (Name, Sportart, Ort, Datum)"><span id="list-count"></span></div>
+      <div id="activity-list"></div>
+      <button id="list-more" class="hidden">Mehr laden</button>
+    </aside>
+    <div id="poster-pane">
+      <div id="poster-toolbar">
+        <div class="seg">
+          <button data-format="square">1:1</button>
+          <button data-format="portrait" class="active">4:5</button>
+          <button data-format="story">9:16</button>
+        </div>
+        <label>Farbe <select id="poster-palette"></select></label>
+        <label><input type="checkbox" id="poster-title" checked> Titel</label>
+        <label><input type="checkbox" id="poster-stats" checked> Statistik</label>
+        <label><input type="checkbox" id="poster-profile" checked> Höhenprofil</label>
+        <span style="margin-left:auto"></span>
+        <button id="btn-poster-copy">In Zwischenablage</button>
+        <button id="btn-poster-download" class="primary">PNG herunterladen</button>
+      </div>
+      <div id="poster-stage">
+        <div id="poster-empty">Links eine Aktivität auswählen.</div>
+        <div id="poster-wrap" class="hidden"><canvas id="poster-canvas"></canvas></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="config.js"></script>
+<script src="js/util.js"></script>
+<script src="js/fit.js"></script>
+<script src="js/zip.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/store.js"></script>
+<script src="js/garmin.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/heatmap.js"></script>
+<script src="js/poster.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
